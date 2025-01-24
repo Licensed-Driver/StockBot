@@ -5,6 +5,7 @@ import pandas as pd
 import csv as csv
 import threading
 import numpy as np
+import yfinance.shared as shared
 
 def saveFortune500() -> pd.DataFrame:
     # Ref: https://stackoverflow.com/a/75845569/
@@ -36,8 +37,11 @@ def getTickerInfo():
         tickers = lines.columns.tolist()
         file.close()
     now = dt.now()
-    max = now - td(days = 8)
-    tickerInfo = yf.download(tickers,start=max.strftime("%Y"+"-"+"%m"+"-"+"%d"), interval="1m", end=now.strftime("%Y"+"-"+"%m"+"-"+"%d"))
+    max = now - td(days = 1)
+    while(True):
+        tickerInfo = yf.download(tickers,start=max.strftime("%Y"+"-"+"%m"+"-"+"%d"), interval="1m", end=now.strftime("%Y"+"-"+"%m"+"-"+"%d"))
+        if(shared._ERRORS.keys().__len__() == 0):
+            break
     return tickerInfo
 
 def saveTickerInfo():
@@ -49,24 +53,22 @@ def saveTickerInfo():
     avg.interpolate(inplace=True)
     avg.bfill(inplace=True)
     avg.ffill(inplace=True)
-    avg.to_csv("Fortune500_PPM_{}.csv".format(dt.now().strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
+    now = dt.now()
+    avg.to_csv("PPM/{}/{}/Fortune500_PPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
     return avg
 
 def normalizePrices(dateTime=dt.now()):
-    prices = pd.read_csv("Fortune500_PPM_{}.csv".format(dateTime.strftime("%Y"+"-"+"%m"+"-"+"%d")), index_col="Datetime", date_format="%Y-%m-%d-%H-%M", dtype="float64")
+    now = dt.now()
+    prices = pd.read_csv("PPM/{}/{}/Fortune500_PPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), index_col="Datetime", date_format="%Y-%m-%d-%H-%M", dtype="float64")
     prices.interpolate(inplace=True)
     threads = []
-    counter = 0
     for col in prices.columns:
-        threads.append(threading.Thread(target=normalizeColumn, args=(prices[col],)).start())
-        print(counter)
-        counter+=1
-    counter = 1
-    for col in threads:
-        print(counter)
-        count+=1
-        col.join()
-    print(prices)
+        thread = threading.Thread(target=normalizeColumn, args=(prices[col],))
+        threads.append(thread)
+        thread.start()
+    for thread in threads:
+        thread.join()
+    prices.to_csv("PCPM/{}/{}/Fortune500_PCPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
         
 
 def normalizeColumn(column):
