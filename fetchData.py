@@ -4,6 +4,7 @@ from datetime import timedelta as td
 import pandas as pd
 import csv as csv
 import threading
+import numpy as np
 
 def saveFortune500() -> pd.DataFrame:
     # Ref: https://stackoverflow.com/a/75845569/
@@ -13,6 +14,10 @@ def saveFortune500() -> pd.DataFrame:
     tickers = pd.read_excel(url, engine='openpyxl', index_col='Ticker', skiprows=4).dropna()
     indices = tickers.index
     tickerList = indices.tolist()
+    tickerList.remove("-")
+    tickerList.remove("BRK.B")
+    tickerList.remove("MRP-W")
+    tickerList.remove("BF.B")
     with open("tickerList.csv", "w") as file:
         tickerList = tickerList.__str__()
         tickerList = tickerList.replace(' ', '')
@@ -29,13 +34,9 @@ def getTickerInfo():
     with open("tickerList.csv", "r") as file:
         lines = pd.read_csv(file)
         tickers = lines.columns.tolist()
-        for n in range(1, 5):
-            tickers.pop()
-        tickers.remove("BRK.B")
-        tickers.remove("-")
         file.close()
     now = dt.now()
-    max = now - td(days = 1)
+    max = now - td(days = 8)
     tickerInfo = yf.download(tickers,start=max.strftime("%Y"+"-"+"%m"+"-"+"%d"), interval="1m", end=now.strftime("%Y"+"-"+"%m"+"-"+"%d"))
     return tickerInfo
 
@@ -43,13 +44,18 @@ def saveTickerInfo():
     tickDat = getTickerInfo()
     high = tickDat.High
     low = tickDat.Low
+    pd.options.mode.use_inf_as_na = True
     avg = (high + low)/2
+    avg.interpolate(inplace=True)
+    avg.bfill(inplace=True)
+    avg.ffill(inplace=True)
     avg.to_csv("Fortune500_PPM_{}.csv".format(dt.now().strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
     return avg
 
 def normalizePrices(dateTime=dt.now()):
-    prices = pd.read_csv("SP500_PPM_{}.csv".format(dateTime.strftime("%Y"+"-"+"%m"+"-"+"%d")), index_col="Datetime", date_format="%Y-%m-%d-%H-%M", dtype="float64")
-    threads = list()
+    prices = pd.read_csv("Fortune500_PPM_{}.csv".format(dateTime.strftime("%Y"+"-"+"%m"+"-"+"%d")), index_col="Datetime", date_format="%Y-%m-%d-%H-%M", dtype="float64")
+    prices.interpolate(inplace=True)
+    threads = []
     counter = 0
     for col in prices.columns:
         threads.append(threading.Thread(target=normalizeColumn, args=(prices[col],)).start())
@@ -71,5 +77,5 @@ def normalizeColumn(column):
         prevPrice = column.iloc[num]
         column.iloc[num] = perChange
         
-
+saveTickerInfo()
 normalizePrices()
