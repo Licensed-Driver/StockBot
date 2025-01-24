@@ -28,5 +28,6 @@ namespace Network {
         void calcOutputs(int layerIndex, int neuronIndex);
         double* makeAMove();
         void backProp();
+        double cost();
     };
 }

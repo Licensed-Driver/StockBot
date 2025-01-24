@@ -161,6 +161,10 @@ double* Network::Network::makeAMove() {
     return returnArr;
 }
 
-void backProp() {
+void Network::Network::backProp() {
+    
+}
+
+double Network::Network::cost() {
 
 }
