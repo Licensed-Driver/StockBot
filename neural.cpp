@@ -160,3 +160,7 @@ double* Network::Network::makeAMove() {
 
     return returnArr;
 }
+
+void backProp() {
+
+}

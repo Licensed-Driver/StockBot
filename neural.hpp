@@ -27,5 +27,6 @@ namespace Network {
         void calcNeuron(int layerIndex, int neuronIndex);
         void calcOutputs(int layerIndex, int neuronIndex);
         double* makeAMove();
+        void backProp();
     };
 }
