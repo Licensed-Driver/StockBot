@@ -19,7 +19,7 @@ def saveFortune500() -> pd.DataFrame:
     tickerList.remove("BRK.B")
     tickerList.remove("MRP-W")
     tickerList.remove("BF.B")
-    with open("tickerList.csv", "w") as file:
+    with open("/home/lpitman/StockBot/tickerList.csv", "w") as file:
         tickerList = tickerList.__str__()
         tickerList = tickerList.replace(' ', '')
         tickerList = tickerList.replace('[', '')
@@ -32,7 +32,7 @@ def saveFortune500() -> pd.DataFrame:
 
 
 def getTickerInfo():
-    with open("tickerList.csv", "r") as file:
+    with open("/home/lpitman/StockBot/tickerList.csv", "r") as file:
         lines = pd.read_csv(file)
         tickers = lines.columns.tolist()
         file.close()
@@ -54,12 +54,12 @@ def saveTickerInfo():
     avg.bfill(inplace=True)
     avg.ffill(inplace=True)
     now = dt.now()
-    avg.to_csv("PPM/{}/{}/Fortune500_PPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
+    avg.to_csv("/home/lpitman/StockBot/PPM/{}/{}/Fortune500_PPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
     return avg
 
 def normalizePrices(dateTime=dt.now()):
     now = dt.now()
-    prices = pd.read_csv("PPM/{}/{}/Fortune500_PPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), index_col="Datetime", date_format="%Y-%m-%d-%H-%M", dtype="float64")
+    prices = pd.read_csv("/home/lpitman/StockBot/PPM/{}/{}/Fortune500_PPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), index_col="Datetime", date_format="%Y-%m-%d-%H-%M", dtype="float64")
     prices.interpolate(inplace=True)
     threads = []
     for col in prices.columns:
@@ -69,7 +69,7 @@ def normalizePrices(dateTime=dt.now()):
     for thread in threads:
         thread.join()
     prices = prices.transpose()
-    prices.to_csv("PCPM/{}/{}/Fortune500_PCPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
+    prices.to_csv("/home/lpitman/StockBot/PCPM/{}/{}/Fortune500_PCPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
         
 
 def normalizeColumn(column):
