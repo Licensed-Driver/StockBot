@@ -24,7 +24,7 @@ int main() {
 
     test.giveInputs(arr);
 
-    double* returnArr = test.makeAMove();
+    double* returnArr = test.output();
 };
 
 Network::Network::Network(size_t inputs, size_t layers, size_t neurons, size_t outputs) {
@@ -145,7 +145,7 @@ void Network::Network::calcOutputs(int layerIndex, int neuronIndex) {
     *(*(data + layerIndex) + neuronIndex) = ReLU(sum);
 }
 
-double* Network::Network::makeAMove() {
+double* Network::Network::output() {
     for (int i = 0; i < nLayers; i++) {
         calcLayer(i);
     }
@@ -161,10 +161,29 @@ double* Network::Network::makeAMove() {
     return returnArr;
 }
 
-void Network::Network::backProp() {
+Training::Data::Data(std::string filePath) {
+    ifstream file;
+    file.open(filePath);
+
+    std::vector<std::string> lines;
     
+    std::string temp;
+    while(getline(file, temp)) {
+        lines.push_back(temp);
+    }
 }
 
-double Network::Network::cost() {
+void Training::Data::loss(Network::Network* network, size_t layers, size_t outputs) {
+
+}
+ 
+Training::Training::Training(size_t inputs, size_t layers, size_t neurons, size_t outputs)
+{
+    Network::Network temp();
+    Network::Network* network;
+
+}
+
+void Training::Training::backProp(Network::Network* network) {
 
 }

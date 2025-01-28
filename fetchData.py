@@ -68,6 +68,7 @@ def normalizePrices(dateTime=dt.now()):
         thread.start()
     for thread in threads:
         thread.join()
+    prices = prices.transpose()
     prices.to_csv("PCPM/{}/{}/Fortune500_PCPM_{}.csv".format(now.strftime("%Y"), now.strftime("%m"), now.strftime("%Y"+"-"+"%m"+"-"+"%d")), date_format="%Y-%m-%d-%H-%M")
         
 
