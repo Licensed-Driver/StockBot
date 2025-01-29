@@ -4,10 +4,12 @@
 #include <random>
 #include <thread>
 #include <fstream>
+#include <sstream>
+#include <bits/stdc++.h>
 
 namespace Network {
     class Network {
-    private:
+    public:
         double** data;
         double*** weight;
         double** bias;
@@ -19,10 +21,10 @@ namespace Network {
         int nOutputs;
 
         std::vector<std::thread> threads;
-    public:
         Network(size_t inputs, size_t layers, size_t neurons, size_t outputs);
         void randInit();
         void giveInputs(double* arr);
+        void giveInputs(std::vector<double> vec);
         double ReLU(double x);
         void calcLayer(int layerIndex);
         void calcNeuron(int layerIndex, int neuronIndex);
@@ -31,24 +33,30 @@ namespace Network {
     };
 }
 namespace Training {
-    
+
+    class Data {
+    public:
+        Data(std::string filePath);
+        std::vector<std::string> tickerVector;
+        std::vector<int> oneHotTickers;
+        std::vector<std::vector<double>> dataMatrix;
+        std::vector<std::vector<double>> dateVector;
+        double loss(Network::Network* network, int tickerIndex, int generation);
+        void parseLine(std::vector <double>* dataVector, std::vector<std::vector<double>> date, std::stringstream line);
+        std::vector<double> parseDate(std::string date);
+    };
+
     class Training {
-        private:
+    private:
         int inputs;
         int layers;
         int outputs;
-        public:
-        Training(size_t inputs, size_t layers, size_t neurons, size_t outputs);
-        void train(Network::Network* network, double* initialData);
-        void adjustInputs(Network::Network *network);
-        void backProp(Network::Network* network);
-    };
-
-    class Data {
-        private:
-        int* oneHotTickers;
-        public:
-        Data(string filePath);
-        void loss(Network::Network* network, size_t layers, size_t outputs);
+        Network::Network* networkRef;
+        Data* dataObject;
+    public:
+        Training(Network::Network* network, std::string trainingDataFilePath, int minuteWindow, int hiddenLayers, int hiddenNeurons);
+        void train(std::string tickerToTrain, int generations = 1);
+        void adjustInputs(Network::Network* network, std::vector<double>* slidingWindow, int generation, int tickerIndex);
+        void backProp(Network::Network* network, double learningRate, double error);
     };
 }
