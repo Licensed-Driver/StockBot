@@ -7,6 +7,7 @@
 #include <sstream>
 #include <bits/stdc++.h>
 #include <string>
+#include <omp.h>
 
 namespace Network {
     class Network {

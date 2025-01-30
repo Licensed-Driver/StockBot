@@ -7,9 +7,9 @@ using namespace std;
 int main() {
     Network::Network* test;
 
-    Training::Training trainer(test, "./PCPM/2025/01/Fortune500_PCPM_2025-01-24.csv", 60, 4, 8);
+    Training::Training trainer(test, "./PCPM/2025/01/Fortune500_PCPM_2025-01-24.csv", 60, 16, 16);
 
-    trainer.train(300);
+    trainer.train(329);
 
     std::cout << "Program Ending!" << std::endl;
 };
@@ -82,11 +82,11 @@ void Network::Network::randInit() {
 }
 
 void Network::Network::giveInputs(double* arr) {
-    std::cout << "Loading Inputs..." << std::endl;
+    //std::cout << "Loading Inputs..." << std::endl;
     for (int i = 0; i < nInputs; i++) {
         *(*data + i) = *(arr + i);
     }
-    std::cout << "Inputs Loaded" << std::endl;
+    //std::cout << "Inputs Loaded" << std::endl;
 }
 
 void Network::Network::giveInputs(std::vector<double> vec) {
@@ -104,20 +104,16 @@ void Network::Network::calcLayer(int layerIndex) {
     if (layerIndex <= 0) return;
 
     //std::cout << "Creating " << nNeurons << " Threads..." << std::endl;
+    #pragma omp parallel for
     for (int i = 0; i < (layerIndex >= nLayers - 1 ? nOutputs : nNeurons); i++) {
-        std::thread t(&Network::calcNeuron, this, layerIndex, i);
-        threads.push_back(std::move(t));
+        calcNeuron(layerIndex, i);
     }
     //std::cout << "Threads Created and pushed" << std::endl;
 
     //std::cout << "Joining Threads..." << std::endl;
-    for (std::thread& t : threads) {
-        t.join();
-    }
     //std::cout << "Threads Joined" << std::endl;
 
     //std::cout << "Clearing Completed Threads..." << std::endl;
-    threads.clear();
     //std::cout << "Threads Cleared" << std::endl;
 }
 
@@ -147,9 +143,6 @@ void Network::Network::output() {
 
     //std::cout << "Done Calculations and Weighting" << std::endl;
 
-    for (int i = 0; i < nOutputs; i++) {
-        std::cout << "Last Neuron " << i << " Has Output Value: " << *(*(data + nLayers - 1) + i) << std::endl;
-    }
 
     outputs = *(data + nLayers - 1);
 }
@@ -171,7 +164,7 @@ Training::Data::Data(std::string filePath, int fminuteWindow) {
 
     std::string temp; // Will hold each entry in each line
 
-    std::cout << "Pushing Dates..." << std::endl;
+    //std::cout << "Pushing Dates..." << std::endl;
     int counterNoCont = 0;
     int counterWithCont = 0;
     while (getline(ss, temp, ',')) {
@@ -182,7 +175,7 @@ Training::Data::Data(std::string filePath, int fminuteWindow) {
         parseDate(temp); // Add the parsed vector to the collection of date vectors
         counterWithCont++;
     }
-    std::cout << "Dates Pushed" << std::endl;
+    //std::cout << "Dates Pushed" << std::endl;
 
     while (getline(file, line)) {
         std::stringstream stream(line); // Stream to hold the parsable line
@@ -243,14 +236,14 @@ void Training::Data::parseDate(std::string date) {
 }
 
 Training::Training::Training(Network::Network* network, std::string trainingDataFilePath, int minuteWindow, int hiddenLayers, int hiddenNeurons) {
-    std::cout << "Creating Data Object..." << std::endl;
+    //std::cout << "Creating Data Object..." << std::endl;
     dataObject = new Data(trainingDataFilePath, minuteWindow);
-    std::cout << "Data Object Created" << std::endl;
-    std::cout << "Creating Network Object..." << std::endl;
+    //std::cout << "Data Object Created" << std::endl;
+    //std::cout << "Creating Network Object..." << std::endl;
     network = new Network::Network(minuteWindow * 10, hiddenLayers, hiddenNeurons, 1);
-    std::cout << "Network Object Created" << std::endl;
+    //std::cout << "Network Object Created" << std::endl;
     networkRef = network;
-    std::cout << "Trainer Initialized" << std::endl;
+    //std::cout << "Trainer Initialized" << std::endl;
 }
 
 void Training::Training::train(int generations, std::string tickerToTrain) {
@@ -262,6 +255,7 @@ void Training::Training::train(int generations, std::string tickerToTrain) {
     dataObject->oneHotTickers[tickerIndex] = 1; // Setting the onHotTickers value at the ticker index to 1 to indicate the ticker that we are using
 
     networkRef->randInit();
+    int cycleCounter = 0;
     while (true) {
         if (trainingAll) {
             for (int i = 0; i < 489; i++) {
@@ -271,11 +265,17 @@ void Training::Training::train(int generations, std::string tickerToTrain) {
                 for (int j = 0; j < generations; j++) {
                     networkRef->output();
                     dataObject->loss(networkRef, i, j);
-                    std::cout << "Backpropagating..." << std::endl;
-                    backProp(networkRef, 0.01);
-                    std::cout << "Backpropagated" << std::endl;
+                    //std::cout << "Backpropagating..." << std::endl;
+                    backProp(networkRef, 0.1);
+                    //std::cout << "Backpropagated" << std::endl;
                     adjustInputs(networkRef, j, i);
-                    std::cout << "Error For Generation " << j << " Was: " << dataObject->outputError[0] << std::endl;
+                    if(j == 328) {
+                        for (int k = 0; k < networkRef->nOutputs; k++)
+                        {
+                            std::cout << "Cycle " << cycleCounter << " Ticker Index " << i << " Output Value: " << *(*(networkRef->data + networkRef->nLayers - 1) + k) << " Desired Value: " << dataObject->desiredOutputs[i][j] << " Error: " << abs(dataObject->outputError[0]) << std::endl;
+                        }
+                        //std::cout << "Error For Generation " << j << " Was: " << abs(dataObject->outputError[0]) << std::endl;
+                    }
                 }
                 dataObject->oneHotTickers[i] = 0; // Changing the ticker
                 dataObject->oneHotTickers[i + 1] = 1;
@@ -286,47 +286,48 @@ void Training::Training::train(int generations, std::string tickerToTrain) {
             for (int i = 0; i < generations; i++) {
                 networkRef->output();
                 dataObject->loss(networkRef, tickerIndex, i);
-                std::cout << "Backpropagating..." << std::endl;
+                //std::cout << "Backpropagating..." << std::endl;
                 backProp(networkRef, 1);
-                std::cout << "Backpropagated" << std::endl;
+                //std::cout << "Backpropagated" << std::endl;
                 adjustInputs(networkRef, i, tickerIndex);
-                std::cout << "Error For Generation " << i << " Was: " << abs(dataObject->outputError[0]) << std::endl;
+                double absError = abs(dataObject->outputError[0]);
+                std::cout << "Error For Generation " << i << " Was: " << absError << std::endl;
             }
         }
-
-        std::cout << "Ticker Index: " << tickerIndex << " Data Vector Size: " << dataObject->inputMatrix[tickerIndex].size() << " Inputs: " << networkRef->nInputs << " Expanded: " << dataObject->inputMatrix[tickerIndex][2] << std::endl;
+        cycleCounter++;
+        //std::cout << "Ticker Index: " << tickerIndex << " Data Vector Size: " << dataObject->inputMatrix[tickerIndex].size() << " Inputs: " << networkRef->nInputs << " Expanded: " << dataObject->inputMatrix[tickerIndex][2] << std::endl;
     }
 
 }
 
 void Training::Data::loss(Network::Network* network, int tickerIndex, int generation) {
-    std::cout << "Clearing Previous Errors" << std::endl;
+    //std::cout << "Clearing Previous Errors" << std::endl;
     outputError.clear(); // Make sure the previous errors are gone
-    std::cout << "Calculating New Errors..." << std::endl;
+    //std::cout << "Calculating New Errors..." << std::endl;
     for (int i = 0; i < network->nOutputs; i++) {
-        std::cout << "Entered Loop" << std::endl;
+        //std::cout << "Entered Loop" << std::endl;
         double desiredOut = desiredOutputs[tickerIndex][generation];
-        std::cout << "Got Desired Out" << std::endl;
+        //std::cout << "Got Desired Out" << std::endl;
         double output = network->outputs[i];
-        std::cout << "Got Real Out" << std::endl;
+        //std::cout << "Got Real Out" << std::endl;
         outputError.push_back(desiredOut - output);
-        std::cout << "Pushed Error" << std::endl;
+        //std::cout << "Pushed Error" << std::endl;
     }
-    std::cout << "New Errors Calculated" << std::endl;
+    //std::cout << "New Errors Calculated" << std::endl;
 }
 
 void Training::Training::adjustInputs(Network::Network* network, int generation, int tickerIndex) {
-    std::cout << "Input Vector Size: " << dataObject->inputVector.size() << std::endl;
+    //std::cout << "Input Vector Size: " << dataObject->inputVector.size() << std::endl;
     dataObject->inputVector.erase(dataObject->inputVector.begin(), dataObject->inputVector.begin() + 10);
-    std::cout << "Erased Input Vector" << std::endl;
+    //std::cout << "Erased Input Vector" << std::endl;
     for (int i = 0; i < network->nOutputs; i++) {
-        std::cout << "Pushing " << network->outputs[i] << " To Input Vector" << std::endl;
+        //std::cout << "Pushing " << network->outputs[i] << " To Input Vector" << std::endl;
         dataObject->inputVector.push_back(dataObject->desiredOutputs[tickerIndex][generation]);
-        std::cout << "Pushed Next Desired Output To Input Vector. Pushing Date From Parsed List of Length: " << dataObject->parsedDates.size() << " Using Index: " << dataObject->minuteWindow + generation + 1 << std::endl;
+        //std::cout << "Pushed Next Desired Output To Input Vector. Pushing Date From Parsed List of Length: " << dataObject->parsedDates.size() << " Using Index: " << dataObject->minuteWindow + generation + 1 << std::endl;
         dataObject->inputVector.insert(dataObject->inputVector.end(), dataObject->parsedDates[dataObject->minuteWindow + generation + 1].begin(), dataObject->parsedDates[dataObject->minuteWindow + generation + 1].end());
-        std::cout << "Date Pushed To Input Vector" << std::endl;
+        //std::cout << "Date Pushed To Input Vector" << std::endl;
     }
-    std::cout << "Sending Inputs In Vector Size: " << dataObject->inputVector.size() << " To  Model" << std::endl;
+    //std::cout << "Sending Inputs In Vector Size: " << dataObject->inputVector.size() << " To  Model" << std::endl;
     network->giveInputs(dataObject->inputVector);
 }
 
@@ -339,6 +340,7 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
     }
 
     // Compute output layer delta
+    #pragma omp parallel for
     for (int i = 0; i < network->nOutputs; i++) {
         double derivative = (network->outputs[i] > 0) ? 1.0 : 0.01; // ReLU derivative
         deltas[network->nLayers - 1][i] = 2 * dataObject->outputError[i] * derivative;
@@ -346,6 +348,7 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
 
     // Backpropagate errors to hidden layers
     for (int l = network->nLayers - 2; l > 0; l--) { // Skip input layer
+        #pragma omp parallel for
         for (int j = 0; j < network->nNeurons; j++) {
             double sum = 0.0;
             for (int k = 0; k < ((l == network->nLayers - 2) ? network->nOutputs : network->nNeurons); k++) {
@@ -358,6 +361,7 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
 
     // Update Weights and Biases
     for (int l = 0; l < network->nLayers - 1; l++) { // Skip output layer for weight updates
+        #pragma omp parallel for
         for (int j = 0; j < ((l == 0) ? network->nInputs : network->nNeurons); j++) {
             for (int k = 0; k < ((l == network->nLayers - 2) ? network->nOutputs : network->nNeurons); k++) {
                 double grad = deltas[l + 1][k] * network->data[l][j];
@@ -369,6 +373,7 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
 
     // Update biases
     for (int l = 1; l < network->nLayers; l++) {
+        #pragma omp parallel for
         for (int j = 0; j < ((l == network->nLayers - 1) ? network->nOutputs : network->nNeurons); j++) {
             network->bias[l][j] += learning_rate * deltas[l][j];
         }
