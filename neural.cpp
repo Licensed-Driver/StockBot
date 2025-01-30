@@ -104,7 +104,7 @@ void Network::Network::calcLayer(int layerIndex) {
     if (layerIndex <= 0) return;
 
     //std::cout << "Creating " << nNeurons << " Threads..." << std::endl;
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int i = 0; i < (layerIndex >= nLayers - 1 ? nOutputs : nNeurons); i++) {
         calcNeuron(layerIndex, i);
     }
@@ -266,12 +266,11 @@ void Training::Training::train(int generations, std::string tickerToTrain) {
                     networkRef->output();
                     dataObject->loss(networkRef, i, j);
                     //std::cout << "Backpropagating..." << std::endl;
-                    backProp(networkRef, 0.1);
+                    backProp(networkRef, 0.01);
                     //std::cout << "Backpropagated" << std::endl;
                     adjustInputs(networkRef, j, i);
-                    if(j == 328) {
-                        for (int k = 0; k < networkRef->nOutputs; k++)
-                        {
+                    if (j == 328) {
+                        for (int k = 0; k < networkRef->nOutputs; k++) {
                             std::cout << "Cycle " << cycleCounter << " Ticker Index " << i << " Output Value: " << *(*(networkRef->data + networkRef->nLayers - 1) + k) << " Desired Value: " << dataObject->desiredOutputs[i][j] << " Error: " << abs(dataObject->outputError[0]) << std::endl;
                         }
                         //std::cout << "Error For Generation " << j << " Was: " << abs(dataObject->outputError[0]) << std::endl;
@@ -287,7 +286,7 @@ void Training::Training::train(int generations, std::string tickerToTrain) {
                 networkRef->output();
                 dataObject->loss(networkRef, tickerIndex, i);
                 //std::cout << "Backpropagating..." << std::endl;
-                backProp(networkRef, 1);
+                backProp(networkRef, 0.01);
                 //std::cout << "Backpropagated" << std::endl;
                 adjustInputs(networkRef, i, tickerIndex);
                 double absError = abs(dataObject->outputError[0]);
@@ -310,7 +309,7 @@ void Training::Data::loss(Network::Network* network, int tickerIndex, int genera
         //std::cout << "Got Desired Out" << std::endl;
         double output = network->outputs[i];
         //std::cout << "Got Real Out" << std::endl;
-        outputError.push_back(desiredOut - output);
+        outputError.push_back(output - desiredOut);
         //std::cout << "Pushed Error" << std::endl;
     }
     //std::cout << "New Errors Calculated" << std::endl;
@@ -340,7 +339,7 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
     }
 
     // Compute output layer delta
-    #pragma omp parallel for
+#pragma omp parallel for
     for (int i = 0; i < network->nOutputs; i++) {
         double derivative = (network->outputs[i] > 0) ? 1.0 : 0.01; // ReLU derivative
         deltas[network->nLayers - 1][i] = 2 * dataObject->outputError[i] * derivative;
@@ -348,7 +347,7 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
 
     // Backpropagate errors to hidden layers
     for (int l = network->nLayers - 2; l > 0; l--) { // Skip input layer
-        #pragma omp parallel for
+#pragma omp parallel for
         for (int j = 0; j < network->nNeurons; j++) {
             double sum = 0.0;
             for (int k = 0; k < ((l == network->nLayers - 2) ? network->nOutputs : network->nNeurons); k++) {
@@ -361,7 +360,7 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
 
     // Update Weights and Biases
     for (int l = 0; l < network->nLayers - 1; l++) { // Skip output layer for weight updates
-        #pragma omp parallel for
+#pragma omp parallel for
         for (int j = 0; j < ((l == 0) ? network->nInputs : network->nNeurons); j++) {
             for (int k = 0; k < ((l == network->nLayers - 2) ? network->nOutputs : network->nNeurons); k++) {
                 double grad = deltas[l + 1][k] * network->data[l][j];
@@ -373,9 +372,9 @@ void Training::Training::backProp(Network::Network* network, double learning_rat
 
     // Update biases
     for (int l = 1; l < network->nLayers; l++) {
-        #pragma omp parallel for
+#pragma omp parallel for
         for (int j = 0; j < ((l == network->nLayers - 1) ? network->nOutputs : network->nNeurons); j++) {
-            network->bias[l][j] += learning_rate * deltas[l][j];
+            network->bias[l][j] -= learning_rate * deltas[l][j];
         }
     }
 
