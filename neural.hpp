@@ -8,6 +8,7 @@
 #include <bits/stdc++.h>
 #include <string>
 #include <omp.h>
+#include <filesystem>
 
 namespace Network {
     class Network {
@@ -39,7 +40,7 @@ namespace Training {
 
     class Data {
     public:
-        Data(std::string filePath, int fminuteWindow);
+        Data(int fminuteWindow);
 
         std::vector<std::vector<double>> inputMatrix; // The input vectors for each possible ticker ready to use
         std::vector<double> inputVector; // The final vector that will be passed as inputs to the model each generation
@@ -49,9 +50,11 @@ namespace Training {
         std::vector<std::string> tickerVector; // A vector that holds all ticker names
         std::vector<int> oneHotTickers; // A vector to hold the one-hot ticker representation
         int minuteWindow; // The amount of minutes that you want to train on
+        int fileCount; // A counter for the amount of files we have opened
 
+        void loadFile(std::string filePath);
         void loss(Network::Network* network, int tickerIndex, int generation);
-        void parseLine(std::stringstream line, int minuteWindow);
+        void parseLine(std::stringstream line, int minuteWindow, int lineIndex = 0);
         void parseDate(std::string date);
     };
 
@@ -64,7 +67,8 @@ namespace Training {
         Data* dataObject;
     public:
         bool trainingAll = false;
-        Training(Network::Network* network, std::string trainingDataFilePath, int minuteWindow, int hiddenLayers, int hiddenNeurons);
+        Training(Network::Network* network, int minuteWindow, int hiddenLayers, int hiddenNeurons, std::string trainingDataFilePath = "");
+        void loadFile(std::string filePath);
         void train(int generations = 1, std::string tickerToTrain = "alltickers");
         void adjustInputs(Network::Network* network, int generation, int tickerIndex);
         void backProp(Network::Network* network, double learningRate);
