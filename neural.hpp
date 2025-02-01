@@ -28,6 +28,7 @@ namespace Network
 
         std::vector<std::thread> threads;
         Network(size_t inputs, size_t layers, size_t neurons, size_t outputs);
+        void freeMem();
         void randInit();
         void giveInputs(double *arr);
         void giveInputs(std::vector<double> vec);
@@ -80,7 +81,7 @@ namespace Training
         bool trainingAll = false;
         Training(Network::Network *network, int minuteWindow, int hiddenLayers, int hiddenNeurons, std::string trainingDataFilePath = "");
         void loadFile(std::string filePath);
-        void train(int generations = 1, std::string tickerToTrain = "alltickers");
+        void train(std::string tickerToTrain = "alltickers");
         void adjustInputs(Network::Network *network, int generation, int tickerIndex);
         void backProp(Network::Network *network, double learningRate);
     };
