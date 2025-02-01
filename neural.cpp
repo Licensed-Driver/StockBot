@@ -18,7 +18,7 @@ int main() {
         }
     }
 
-    Training::Training trainer(test, 60, 16, 16);
+    Training::Training trainer(test, 60, 3, 400);
 
     for (std::set<std::string>::iterator i = dataFiles.begin(); i != dataFiles.end(); i++) {
         std::cout << *i << std::endl;
@@ -219,12 +219,12 @@ void Training::Data::parseLine(std::stringstream line, int minuteWindow, int lin
         while (getline(line, temp, ',')) {
             if (dateIndex < minuteWindow) { // While we're parsing the info that is part of the input vector
                 //std::cout << "Files Opened: " << fileCount << " Attempting Index :" << (fileCount * 390) + dateIndex << " On Date Vector Size: " << parsedDates.size() << std::endl;
-                tempVec.push_back(std::stod(temp)); // Push the PCPM value into the vector
+                tempVec.push_back(std::stod(temp) * 100); // Push the PCPM value into the vector
                 tempVec.insert(tempVec.end(), parsedDates[(fileCount * 390) + dateIndex].begin(), parsedDates[(fileCount * 390) + dateIndex].end()); // Push parsed date info after it so it has date context for each value. Starting from first date of the current file since each file has 390 dates
             } else { // Once we're out of the input vector range
                 inputMatrix.push_back(std::move(tempVec)); // Push our input vector to the matrix
                 tempVec.clear(); // Clear the vector to start outputs
-                tempVec.push_back(std::stod(temp)); // Push the number we just got on the last condition check
+                tempVec.push_back(std::stod(temp) * 100); // Push the number we just got on the last condition check
                 break;
             }
             dateIndex++; // Increment index to track correct date
@@ -232,7 +232,7 @@ void Training::Data::parseLine(std::stringstream line, int minuteWindow, int lin
     }
 
     while (getline(line, temp, ',')) { // Keep parsing the line
-        tempVec.push_back(std::stod(temp)); // Push them without the dates to the output vector
+        tempVec.push_back(std::stod(temp) * 100); // Push them without the dates to the output vector
     }
 
     if (fileCount < 1) {
@@ -305,7 +305,7 @@ void Training::Training::train(int generations, std::string tickerToTrain) {
                     dataObject->loss(networkRef, i, j);
                     sum += dataObject->outputError[0];
                     //std::cout << "Backpropagating..." << std::endl;
-                    backProp(networkRef, 0.01);
+                    backProp(networkRef, 0.001);
                     //std::cout << "Backpropagated" << std::endl;
                     adjustInputs(networkRef, j, i);
                 }
