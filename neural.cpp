@@ -4,8 +4,10 @@ using namespace std;
 
 std::string PCPMDirectory = "./PCPM/";
 
-int main()
+int main(int argsc, char* argsv[])
 {
+    if(argsc < 2) printf("Format: ./{name} minuteWindow=60 hiddenLayers=2 hiddenNeurons=600 tickerToTrain=alltickers");
+
     Network::Network *test;
 
     std::set<std::string> dataFiles;
@@ -21,7 +23,7 @@ int main()
         }
     }
 
-    Training::Training trainer(test, 60, 3, 400);
+    Training::Training trainer(test, ((argsc > 1) ? std::stoi(argsv[1]) : 60), ((argsc > 2) ? std::stoi(argsv[2]) : 2), ((argsc > 3) ? std::stoi(argsv[3]) : 600));
 
     for (std::set<std::string>::iterator i = dataFiles.begin(); i != dataFiles.end(); i++)
     {
@@ -29,7 +31,10 @@ int main()
         trainer.loadFile(*i);
     }
 
-    trainer.train(329);
+    trainer.train(((argsc > 4) ? argsv[4] : "alltickers"));
+
+    test->freeMem();
+    free(test);
 
     std::cout << "Program Ending!" << std::endl;
 };
@@ -77,6 +82,46 @@ Network::Network::Network(size_t inputs, size_t layers, size_t neurons, size_t o
             }
         }
     }
+}
+
+void Network::Network::freeMem() {
+
+
+    for (int i = 0; i < nLayers; i++)
+    {
+        // The first layer is always the inputs
+        if (i == 0)
+        {
+            // Initializing the pointers within each array
+            for (int j = 0; j < nInputs; j++)
+            {
+                free(*(*(weight + i) + j));
+            }
+            free(*(weight + i));
+            free(*(data + i));
+            free(*(bias + i));
+        }
+        else if (i == nLayers - 1)
+        {
+            // Output layer doesn't have weights
+            free(*(data + i));
+            free(*(bias + i));
+        }
+        else
+        {
+            for (int j = 0; j < nNeurons; j++)
+            {
+                free(*(*(weight + i) + j));
+            }
+            free(*(weight + i));
+            free(*(data + i));
+            free(*(bias + i));
+        }
+    }
+
+    free(weight);
+    free(bias);
+    free(data);
 }
 
 void Network::Network::randInit()
@@ -154,9 +199,9 @@ double Network::Network::tanHyperbolic(double x)
     return tanh(x);
 }
 
-double softplus(double x) { return x > 20 ? x : log(1 + exp(x)); }
+double softplus(double x) { return log(1 + std::min(DBL_MAX - 5, exp(std::max(-700.0, std::min(700.0, x))))); }
 
-double sigmoid(double x) {return    1/(1 + exp(-x));}
+double sigmoid(double x) { return 1 / (1 + exp(std::max(-700.0, std::min(700.0, -x)))); }
 
 void Network::Network::calcLayer(int layerIndex)
 {
@@ -202,7 +247,10 @@ void Network::Network::calcOutputs(int layerIndex, int neuronIndex)
         double temp = *(*(data + prevIndex) + j);
         sum += temp * *(*(*(weight + prevIndex) + j) + neuronIndex);
     }
-    *(*(data + layerIndex) + neuronIndex) = (neuronIndex == 1) ? sigmoid(sum + *(*(bias + layerIndex) + neuronIndex)) : softplus(sum + *(*(bias + layerIndex) + neuronIndex));
+
+    //std::cout << "Attempting To Softplus: " << sum + *(*(bias + layerIndex) + neuronIndex) << " = " << softplus(sum + *(*(bias + layerIndex) + neuronIndex)) << std::endl;
+
+    * (*(data + layerIndex) + neuronIndex) = (neuronIndex == 1) ? sigmoid(sum + *(*(bias + layerIndex) + neuronIndex)) : softplus(sum + *(*(bias + layerIndex) + neuronIndex));
 }
 
 void Network::Network::output()
@@ -354,16 +402,23 @@ void Training::Training::loadFile(std::string filePath)
     dataObject->loadFile(filePath);
 }
 
-void Training::Training::train(int generations, std::string tickerToTrain)
+void Training::Training::train(std::string tickerToTrain)
 {
 
     std::cout << "DesiredOutputs: " << dataObject->desiredOutputs[0].size() << " Parsed Dates: " << dataObject->parsedDates.size() << std::endl;
 
     trainingAll = tickerToTrain.compare("alltickers") ? false : true;
 
-    auto tickerIterator = find(dataObject->tickerVector.begin(), dataObject->tickerVector.end(), tickerToTrain); // Getting the iterator that will give us the index of the ticker
-    int tickerIndex = distance(dataObject->tickerVector.begin(), tickerIterator);                                // Getting the index of the ticker
-    dataObject->oneHotTickers[tickerIndex] = 1;                                                                  // Setting the onHotTickers value at the ticker index to 1 to indicate the ticker that we are using
+    int tickerIndex = 0;
+
+    if (!trainingAll)
+    {
+        for(int i = 0; i < (int)dataObject->tickerVector.size(); i++) {
+            if(!dataObject->tickerVector[i].compare(tickerToTrain)) {tickerIndex = i; dataObject->oneHotTickers[tickerIndex] = 1; break;}  // Getting the index of the ticker // Setting the onHotTickers value at the ticker index to 1 to indicate the ticker that we are using
+        }                               
+    }
+
+    std::cout << "Ticker: " << tickerToTrain << " Index: " << tickerIndex << " DesiredOutputs: " << dataObject->desiredOutputs[0].size() << " Parsed Dates: " << dataObject->parsedDates.size() << std::endl;
 
     networkRef->randInit();
     int cycleCounter = 0;
@@ -399,18 +454,24 @@ void Training::Training::train(int generations, std::string tickerToTrain)
         }
         else
         {
+            dataObject->inputVector.clear();
             dataObject->inputVector.insert(dataObject->inputVector.begin(), dataObject->inputMatrix[tickerIndex].begin(), dataObject->inputMatrix[tickerIndex].end());
-            networkRef->giveInputs(dataObject->inputMatrix[tickerIndex]); // Load the input vector into the model
-            for (int i = 0; i < generations; i++)
-            {
+            networkRef->giveInputs(dataObject->inputMatrix[tickerIndex]);
+            double sum = 0;
+            for (long unsigned int j = 0; j < dataObject->desiredOutputs[tickerIndex].size(); j++) {
+                double sum = 0;
                 networkRef->output();
-                dataObject->loss(networkRef, tickerIndex, i);
+                // std::cout << "Getting Loss..." << std::endl;
+                dataObject->loss(networkRef, tickerIndex, j);
+                sum += networkRef->outputs[0] - dataObject->desiredOutput;
                 // std::cout << "Backpropagating..." << std::endl;
-                backProp(networkRef, 0.001);
+                backProp(networkRef, 0.0001);
                 // std::cout << "Backpropagated" << std::endl;
-                adjustInputs(networkRef, i, tickerIndex);
-                double absError = abs(dataObject->outputError[0]);
-                std::cout << "Error For Generation " << i << " Was: " << absError << std::endl;
+                adjustInputs(networkRef, j, tickerIndex);
+            }
+            for (int outLooper = 0; outLooper < 1; outLooper++)
+            {
+                std::cout << "Cycle: " << cycleCounter << " Ticker Index: " << tickerIndex << " Generations: " << dataObject->desiredOutputs.size() << " Output Value: " << networkRef->outputs[0] * (networkRef->outputs[1] < 0.5 ? -1 : 1) << " Desired Value: " << dataObject->desiredOutputs[tickerIndex][dataObject->desiredOutputs[tickerIndex].size() - 1] << " Average Magnitude Error: " << sum / dataObject->desiredOutputs.size() << std::endl;
             }
         }
         cycleCounter++;
@@ -427,7 +488,7 @@ void Training::Data::loss(Network::Network *network, int tickerIndex, int genera
     {
         // std::cout << "Entered Loop" << std::endl;
         double desiredOut = softplus(desiredOutputs[tickerIndex][generation]);
-        // std::cout << "Got Desired Out" << std::endl;
+        // std::cout << "Got Desired Out: " << desiredOut << std::endl;
         double output = network->outputs[i];
         // std::cout << "Got Real Out" << std::endl;
         outputError.push_back((output - desiredOut) * (output - desiredOut));
